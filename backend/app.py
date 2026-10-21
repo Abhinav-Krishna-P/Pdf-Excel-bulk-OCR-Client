@@ -6,7 +6,8 @@ import re
 import subprocess
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+import fitz  # PyMuPDF
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
 
 from .excel_writer import write_workbook
@@ -36,6 +37,29 @@ async def _read_upload(file: UploadFile, exts: tuple[str, ...]) -> bytes:
     if len(data) > MAX_UPLOAD:
         raise HTTPException(413, "File too large (max 40 MB).")
     return data
+
+
+def _unlock_pdf(data: bytes, password: str | None) -> bytes:
+    """Return the PDF bytes with any open-password removed.
+
+    Raises 401 with X-Error = password_required / wrong_password so the UI can
+    prompt for (or reject) a password.
+    """
+    try:
+        doc = fitz.open(stream=data, filetype="pdf")
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(400, "This file is not a readable PDF.") from e
+    try:
+        if not doc.needs_pass:
+            return data
+        if not password:
+            raise HTTPException(401, "This PDF is password protected.", headers={"X-Error": "password_required"})
+        if not doc.authenticate(password):
+            raise HTTPException(401, "Incorrect password.", headers={"X-Error": "wrong_password"})
+        # Save decrypted: the PDF is embedded in the workbook for the Excel -> PDF step.
+        return doc.tobytes(encryption=fitz.PDF_ENCRYPT_NONE)
+    finally:
+        doc.close()
 
 
 def _save_and_open(data: bytes, name: str) -> Path:
@@ -99,8 +123,8 @@ def health() -> dict:
 
 
 @app.post("/api/pdf-to-excel")
-async def pdf_to_excel(file: UploadFile = File(...)) -> Response:
-    pdf_bytes = await _read_upload(file, (".pdf",))
+async def pdf_to_excel(file: UploadFile = File(...), password: str | None = Form(None)) -> Response:
+    pdf_bytes = _unlock_pdf(await _read_upload(file, (".pdf",)), password)
     try:
         pages = extract_pages(pdf_bytes)
         xlsx = write_workbook(pages, pdf_bytes, file.filename or "statement.pdf")
@@ -148,7 +172,7 @@ async def excel_to_pdf_route(file: UploadFile = File(...)) -> Response:
 
 @app.exception_handler(HTTPException)
 async def _http_exc(_, exc: HTTPException) -> JSONResponse:
-    return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+    return JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers=exc.headers)
 
 
 if __name__ == "__main__":

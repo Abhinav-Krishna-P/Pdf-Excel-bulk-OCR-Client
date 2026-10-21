@@ -170,6 +170,26 @@
   @keyframes toastIn { from { opacity: 0; transform: translateY(12px) scale(.96); } to { opacity: 1; transform: none; } }
   @keyframes toastOut { to { opacity: 0; transform: translateX(24px); } }
 
+  /* ---------- dialogs ---------- */
+  dialog.modal { border: 0; padding: 0; border-radius: 18px; width: min(400px, calc(100vw - 32px)); background: var(--surface);
+                 color: var(--ink); box-shadow: 0 30px 70px -20px rgba(15, 23, 42, .45); }
+  dialog.modal[open] { animation: modalIn .3s var(--ease) both; }
+  dialog.modal::backdrop { background: rgba(15, 23, 42, .45); backdrop-filter: blur(3px); }
+  @keyframes modalIn { from { opacity: 0; transform: translateY(10px) scale(.97); } to { opacity: 1; transform: none; } }
+  .modal form { padding: 24px; margin: 0; }
+  .modal-ic { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; margin-bottom: 14px;
+              background: var(--brand-soft); color: var(--brand); }
+  .modal-ic.err { background: var(--err-soft); color: var(--err); }
+  .modal h3 { margin: 0 0 4px; font-size: 17px; letter-spacing: -.01em; }
+  .modal p { margin: 0; color: var(--muted); font-size: 13.5px; overflow-wrap: anywhere; }
+  .modal .field { position: relative; margin-top: 16px; }
+  .modal input { width: 100%; font: inherit; padding: 10px 64px 10px 12px; border: 1px solid var(--line); border-radius: 10px;
+                 color: var(--ink); background: var(--surface); outline: none; transition: border-color .2s, box-shadow .2s; }
+  .modal input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
+  .modal .peek { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: 0; background: none;
+                 color: var(--brand); font-size: 12px; font-weight: 600; cursor: pointer; padding: 6px 8px; }
+  .modal .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
   /* entrance */
   .reveal { opacity: 0; transform: translateY(10px); animation: rowIn .6s var(--ease) forwards; }
   .d1 { animation-delay: .05s; } .d2 { animation-delay: .12s; } .d3 { animation-delay: .19s; } .d4 { animation-delay: .26s; }
@@ -278,6 +298,31 @@
 
 <div class="toasts" id="toasts"></div>
 
+<dialog class="modal" id="pwDlg">
+  <form method="dialog">
+    <div class="modal-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+    <h3>Password required</h3>
+    <p><b id="pwFile"></b> is encrypted. Enter its password to continue.</p>
+    <div class="field">
+      <input type="password" id="pwInput" placeholder="PDF password" autocomplete="off" required>
+      <button type="button" class="peek" id="pwPeek">Show</button>
+    </div>
+    <div class="row">
+      <button type="button" class="btn" id="pwCancel">Cancel</button>
+      <button type="submit" class="btn primary" value="ok">Unlock</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="modal" id="msgDlg">
+  <form method="dialog">
+    <div class="modal-ic err"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg></div>
+    <h3 id="msgTitle"></h3>
+    <p id="msgText"></p>
+    <div class="row"><button class="btn primary" value="ok">OK</button></div>
+  </form>
+</dialog>
+
 <script>
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -298,6 +343,27 @@
     t.innerHTML = `<span class="ti">${kind === 'ok' ? '✓' : '!'}</span><span>${esc(text)}</span>`;
     $('toasts').appendChild(t);
     setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 300); }, 3800);
+  }
+
+  /* dialogs */
+  function askPassword(fileName) {
+    const dlg = $('pwDlg'), input = $('pwInput');
+    $('pwFile').textContent = fileName;
+    input.value = ''; input.type = 'password'; $('pwPeek').textContent = 'Show';
+    dlg.returnValue = '';
+    dlg.showModal(); input.focus();
+    return new Promise((resolve) => {
+      dlg.addEventListener('close', () => resolve(dlg.returnValue === 'ok' ? input.value : null), { once: true });
+    });
+  }
+  $('pwPeek').addEventListener('click', () => {
+    const show = $('pwInput').type === 'password';
+    $('pwInput').type = show ? 'text' : 'password'; $('pwPeek').textContent = show ? 'Hide' : 'Show';
+  });
+  $('pwCancel').addEventListener('click', () => $('pwDlg').close());
+  function showMessage(title, text) {
+    $('msgTitle').textContent = title; $('msgText').textContent = text;
+    $('msgDlg').showModal();
   }
 
   /* actions */
@@ -353,7 +419,7 @@
   renderHistory(); renderStats();
 
   /* upload with real progress */
-  function upload(url, file, onProgress) {
+  function upload(url, file, onProgress, password) {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', url);
@@ -364,10 +430,14 @@
         if (xhr.status >= 200 && xhr.status < 300) return resolve(xhr);
         let msg = xhr.statusText || 'Request failed';
         try { msg = JSON.parse(await xhr.response.text()).detail || msg; } catch (_) {}
-        reject(new Error(msg));
+        const err = new Error(msg);
+        err.code = xhr.getResponseHeader('X-Error');
+        reject(err);
       };
       xhr.onerror = () => reject(new Error('Server not reachable'));
-      const fd = new FormData(); fd.append('file', file); xhr.send(fd);
+      const fd = new FormData(); fd.append('file', file);
+      if (password != null) fd.append('password', password);
+      xhr.send(fd);
     });
   }
 
@@ -385,7 +455,9 @@
         <div class="bar${state === 'busy' ? '' : ''}"><i></i></div>${extra}</div>`;
     }
 
-    async function send(file) {
+    function clear() { job.className = 'job'; job.innerHTML = ''; }
+
+    async function send(file, password) {
       if (!file) return;
       if (!accept.some(x => file.name.toLowerCase().endsWith(x))) { toast('err', `Please choose a ${accept.join(' / ')} file`); return; }
       drop.classList.add('busy');
@@ -395,7 +467,7 @@
         const xhr = await upload(url, file, (p) => {
           fill.style.width = Math.round(p * 100) + '%';
           if (p >= 1) { bar.classList.add('indet'); fill.style.width = ''; meta.textContent = 'Processing… scanned pages take a few seconds'; }
-        });
+        }, password);
         const name = xhr.getResponseHeader('X-Saved-As');
         const changes = xhr.getResponseHeader('X-Changes');
         const pages = xhr.getResponseHeader('X-Pages');
@@ -409,6 +481,17 @@
         remember(name);
         toast('ok', `${name} is ready and opening`);
       } catch (e) {
+        if (e.code === 'password_required') {
+          meta.textContent = 'Waiting for password…';
+          const pw = await askPassword(file.name);
+          if (pw == null) { clear(); toast('err', 'Encrypted PDF removed'); return; }
+          return send(file, pw);
+        }
+        if (e.code === 'wrong_password') {
+          clear();
+          showMessage('Incorrect password', `The password for "${file.name}" is wrong, so the PDF was removed. Upload it again to retry.`);
+          return;
+        }
         panel('err', file.name, esc(e.message));
         toast('err', 'Conversion failed');
       } finally {
