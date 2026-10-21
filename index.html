@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tesseract vs Indra OCR</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: a single reading column of numbered findings; each chart is a bordered "exhibit" like a lab report figure */
+:root {
+  --bg: #f6f7f9; --panel: #fcfcfd; --ink: #0f1115; --ink-2: #4d5260; --muted: #858a96;
+  --grid: #e3e5ea; --axis: #c5c8d0; --line: rgba(15,17,21,.10);
+  --indra: #2a78d6; --tess: #eb6834; --base: #9a9ea8; --good: #006300; --bad: #c03030;
+  --indra-tint: rgba(42,120,214,.08); --tess-tint: rgba(235,104,52,.08);
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #111317; --panel: #181a1f; --ink: #eef0f3; --ink-2: #b9bdc7; --muted: #8b909b;
+  --grid: #2a2d34; --axis: #3a3e47; --line: rgba(255,255,255,.10);
+  --indra: #3987e5; --tess: #d95926; --base: #6f7480; --good: #3cbf3c; --bad: #ff7070;
+  --indra-tint: rgba(57,135,229,.12); --tess-tint: rgba(217,89,38,.12); color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #111317; --panel: #181a1f; --ink: #eef0f3; --ink-2: #b9bdc7; --muted: #8b909b;
+  --grid: #2a2d34; --axis: #3a3e47; --line: rgba(255,255,255,.10);
+  --indra: #3987e5; --tess: #d95926; --base: #6f7480; --good: #3cbf3c; --bad: #ff7070;
+  --indra-tint: rgba(57,135,229,.12); --tess-tint: rgba(217,89,38,.12); color-scheme: dark }
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font: 15px/1.6 var(--sans); }
+.wrap { max-width: 980px; margin: 0 auto; padding-block: 40px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 40px }
+h1, h2, h3 { text-wrap: balance; margin: 0; line-height: 1.2 }
+h1 { font-size: clamp(28px, 4.4vw, 40px); font-weight: 700; letter-spacing: -.02em }
+h2 { font-size: 22px; font-weight: 600; letter-spacing: -.01em }
+h3 { font-size: 17px; font-weight: 600 }
+p { margin: 0; max-width: 68ch } .muted { color: var(--muted) } .ink2 { color: var(--ink-2) }
+.mono, .num { font-family: var(--mono) } .num { font-variant-numeric: tabular-nums }
+.eyebrow { font: 500 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted) }
+header { display: grid; gap: 14px }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 18px; font: 13px var(--mono); color: var(--ink-2) }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font: 13px var(--mono); color: var(--ink-2) }
+.sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 6px }
+section { display: grid; gap: 18px }
+.sec-head { display: grid; gap: 6px; border-top: 1px solid var(--line); padding-top: 22px }
+.verdict { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px }
+.vcard { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: grid; gap: 8px; align-content: start }
+.vcard .k { font: 500 12px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted) }
+.vcard .v { font: 600 26px/1.15 var(--sans); letter-spacing: -.01em }
+.vcard p { font-size: 14px; color: var(--ink-2) }
+.win { font: 600 11px var(--mono); padding: 2px 8px; border-radius: 999px; justify-self: start; letter-spacing: .04em }
+.win.i { color: var(--indra); background: var(--indra-tint) } .win.t { color: var(--tess); background: var(--tess-tint) } .win.n { color: var(--ink-2); background: var(--line) }
+.exhibit { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 22px 22px 18px; display: grid; gap: 12px; min-width: 0 }
+.exhibit .cap { font-size: 13.5px; color: var(--ink-2) }
+.exhibit .note { font-size: 13px; color: var(--muted); max-width: 80ch }
+.pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px }
+.chart { width: 100%; overflow-x: auto } .chart svg { display: block; width: 100%; height: auto; overflow: visible }
+svg text { font-family: var(--mono); font-size: 12px; fill: var(--ink-2) }
+svg .lbl { fill: var(--ink-2); font-size: 13px } svg .val { fill: var(--ink); font-weight: 500 }
+svg .tick { fill: var(--muted); font-size: 11px } svg .ax-title { fill: var(--muted); font-family: var(--sans); font-size: 12.5px }
+svg .grid { stroke: var(--grid); stroke-width: 1 } svg .axis { stroke: var(--axis); stroke-width: 1 }
+.tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--panel) }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; min-width: 620px }
+th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line); vertical-align: top }
+th { font: 500 12px var(--mono); color: var(--muted); letter-spacing: .04em; text-transform: uppercase; background: var(--bg) }
+td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap }
+th.n { text-align: right } tr:last-child td { border-bottom: 0 }
+td .best { color: var(--good); font-weight: 600 }
+.grp td { font: 600 12px var(--mono); color: var(--ink-2); background: var(--bg); letter-spacing: .05em; text-transform: uppercase }
+.diff { display: grid; grid-template-columns: 1fr 1fr 1fr; font: 12.5px/1.5 var(--mono); min-width: 640px }
+.diff div { padding: 4px 12px; border-bottom: 1px solid var(--line); white-space: pre-wrap; word-break: break-word }
+.diff .h { color: var(--muted); font-weight: 500; text-transform: uppercase; font-size: 11.5px; letter-spacing: .05em; background: var(--bg) }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 8px; max-width: 80ch } ul.plain li { color: var(--ink-2) } ul.plain b { color: var(--ink) }
+#tip { position: fixed; pointer-events: none; z-index: 20; background: var(--ink); color: var(--bg); font: 12px/1.45 var(--mono);
+  padding: 7px 10px; border-radius: 6px; max-width: 260px; opacity: 0; transition: opacity .08s }
+.hit { fill: transparent; cursor: default } .hit:hover + .bar, .bar:hover { opacity: .85 }
+@media (prefers-reduced-motion: reduce) { #tip { transition: none } }
+</style>
+<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow">OCR engine benchmark · 21 Oct 2026</span>
+    <h1>Tesseract 5 vs Indra OCR on a 248-page PDF</h1>
+    <p class="ink2">Both engines were run through the Integra Studio web app in Chrome, with forced OCR on every page of a 248-page born-digital test PDF. A second, per-page harness timed the OCR call alone and scored accuracy against the PDF's own embedded text layer, which serves as exact ground truth.</p>
+    <div class="meta"><span>AMD Ryzen 3 5300U · 4 cores / 8 threads · 7.3 GB</span><span>Windows 11 · Chrome 156</span><span>Tesseract 5.4.0 · Indra OCR 1.1.2</span><span>43,728 reference words · 440,719 chars</span></div>
+    <div class="legend"><span><i class="sw" style="background:var(--indra)"></i>Indra OCR</span><span><i class="sw" style="background:var(--tess)"></i>Tesseract 5</span><span><i class="sw" style="background:var(--base)"></i>Text layer, no OCR (reference)</span></div>
+  </header>
+
+  <section>
+    <div class="sec-head"><span class="eyebrow">Verdict</span><h2>Same speed on this laptop. Indra is far more accurate but costs 5× the CPU.</h2></div>
+    <div class="verdict" id="verdict"></div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="eyebrow">1 · Speed</span><h2>Throughput and latency</h2>
+      <p class="ink2">The vendor chart claims 49.4 vs 2.9 pages/s on 32 EPYC cores with one worker per core. On this 4-core laptop the two engines finish within 2% of each other when run one request at a time, the way the app runs them. Run the vendor's way, with one worker per core, Tesseract is about 2.2× faster.</p></div>
+    <div class="exhibit"><h3>Pages per second, end to end in Chrome</h3><span class="cap">Upload, extraction, layout analysis and Excel write for all 248 pages. Higher is faster.</span><div class="chart" id="c-pps"></div>
+      <span class="note">Each engine had one run. The text-layer reference came from an earlier run on the stale :8000 server (same pipeline, OCR skipped).</span></div>
+    <div class="pair">
+      <div class="exhibit"><h3>Seconds per page, OCR call only</h3><span class="cap">Mean of 248 pages, with median and 95th percentile. Lower is faster.</span><div class="chart" id="c-spp"></div></div>
+      <div class="exhibit"><h3>Where the time goes</h3><span class="cap">Server-reported phases of each Chrome run, in seconds. Darkest segment: OCR + layout analysis. Then Excel write, then save and download. Upload (0.1 s) is too thin to see.</span><div class="chart" id="c-phase"></div></div>
+    </div>
+    <div class="exhibit"><h3>OCR time for every page</h3><span class="cap">Milliseconds per page, in page order. Hover for exact values.</span><div class="chart" id="c-pages"></div>
+      <span class="note">Indra's page 1 includes graph warm-up after its 5.0 s model load. Its spread is wider (σ 674 ms vs 387 ms; worst page 7.4 s vs 4.5 s).</span></div>
+    <div class="exhibit"><h3>Re-running the vendor's setup: several workers, one thread each</h3><span class="cap">Pages per second on the first 24 pages, OCR call only, after warm-up. The vendor chart reports Indra at 49.4 and Tesseract at 2.9 on 32 EPYC cores.</span><div class="chart" id="c-workers"></div>
+      <span class="note">With one worker per core, Tesseract reaches 1.85 pages/s and Indra peaks at 0.82, so Tesseract is about 2.2× faster on this machine. One Indra thread needs about 4.7 s per page here. The vendor's 49.4 pages/s on 32 cores implies about 0.65 s. Their Tesseract figure implies about 11 s per page, against 2.4 s measured here, so the claimed gap comes from both sides of the comparison.</span></div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="eyebrow">2 · Accuracy</span><h2>Recognition quality against the PDF's own text</h2>
+      <p class="ink2">Every page's text layer was extracted with PyMuPDF and compared with each engine's output after the same reading-order grouping.</p></div>
+    <div class="pair">
+      <div class="exhibit"><h3>Error rates</h3><span class="cap">Character and word error rate. Lower is better.</span><div class="chart" id="c-err"></div></div>
+      <div class="exhibit"><h3>Pages under an error threshold</h3><span class="cap">Count of the 248 pages, by page CER.</span><div class="chart" id="c-thr"></div></div>
+    </div>
+    <div class="exhibit"><h3>Field-level accuracy</h3><span class="cap">Share of reference items each engine reproduced exactly. Higher is better; the axis starts at 80%.</span><div class="chart" id="c-acc"></div>
+      <span class="note">Decimal numbers are tokens such as 1,234.56 (8,612 in the file). Dates match DD-MM-YYYY style (5,096). Excel cell F1 compares every non-empty cell of each engine's workbook with the workbook built from the text layer. Box placement is the share of OCR words whose box overlaps the matching reference word at IoU ≥ 0.5.</span></div>
+    <div class="exhibit"><h3>Character error rate for every page</h3><span class="cap">Per-page CER in page order. Indra stays under 2% on 245 of 248 pages; Tesseract never gets under 2%.</span><div class="chart" id="c-pcer"></div></div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="eyebrow">3 · Resources</span><h2>CPU and memory</h2>
+      <p class="ink2">The server worker process and its children were sampled every 0.5 s during each Chrome run. 100% equals one fully busy logical core; this machine has 8.</p></div>
+    <div class="exhibit"><h3>Server CPU during the Chrome runs</h3><span class="cap">Percent of one core, over seconds since the run started.</span><div class="chart" id="c-cpu"></div>
+      <span class="note">Indra spreads across 5–7 cores during OCR. Tesseract stays near one core, because each page is a single-threaded tesseract.exe call. Both drop to one core for the final Excel write.</span></div>
+    <div class="pair">
+      <div class="exhibit"><h3>CPU-seconds per page</h3><span class="cap">Average CPU × run time ÷ 248. Lower leaves more room for parallel jobs.</span><div class="chart" id="c-cpusec"></div></div>
+      <div class="exhibit"><h3>Peak memory</h3><span class="cap">Peak resident memory of the server process tree, MB.</span><div class="chart" id="c-mem"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="eyebrow">4 · Error analysis</span><h2>What each engine gets wrong</h2></div>
+    <div class="exhibit"><h3>Most frequent character edits</h3><span class="cap">Reference → OCR, summed over all pages. ∅ means the character was dropped. Space→newline edits are line-grouping noise common to both and are excluded.</span>
+      <div class="tbl-wrap"><table id="conf"></table></div></div>
+    <ul class="plain">
+      <li><b>Tesseract drops characters.</b> Its top errors are deletions of I, 1, A, 2, 0 and N, mostly in narrow, tightly packed text. That is why 11% of its dates are wrong.</li>
+      <li><b>Indra substitutes.</b> It confuses l/I (396) and reads some 2s as $ (138) and 6s as @ (21). That is a risk for numeric data, though only 12 of 8,612 decimal numbers were wrong.</li>
+      <li><b>Both are strong on decimal numbers.</b> Tesseract got 99.72% exact and Indra 99.86%, which means 24 versus 12 wrong values across the whole document.</li>
+    </ul>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="eyebrow">5 · All metrics</span><h2>Full results</h2></div>
+    <div class="tbl-wrap"><table id="all"></table></div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="eyebrow">6 · Method</span><h2>How this was measured</h2></div>
+    <ul class="plain">
+      <li><b>Chrome runs.</b> The app UI was driven through Claude in Chrome: upload the PDF, pick the engine, tick “OCR every page”, convert. Tesseract ran first, then Indra. A hook on the page's XHR recorded upload time, total time and the server's X-Extract-Ms / X-Excel-Ms headers.</li>
+      <li><b>Fresh server.</b> The running :8000 server had not reloaded the current code, so it ignored forced OCR and read the text layer instead (141.8 s, kept here as the reference). The benchmark used a fresh instance of the same code on :8001. Indra's Chrome run therefore includes its 5.0 s cold model load.</li>
+      <li><b>Per-page harness.</b> Each page went through the app's own render and line-mask steps, then only <span class="mono">words_from_ocr</span> or <span class="mono">words_from_indra</span> was timed. Each engine ran in its own process, one after the other, with nothing else running.</li>
+      <li><b>Ground truth.</b> The PDF is born-digital, so its embedded text is exact. CER and WER are Levenshtein distances over reading-order text. Line grouping adds identical noise to both engines, so read absolute CER as an upper bound and the gap between engines as the result.</li>
+      <li><b>Limits.</b> One document with one layout, one run per engine, one 4-core laptop, one request at a time. Tesseract's single-threaded profile means parallel workers would likely raise its throughput much more than Indra's. That is an inference from the CPU data and was not measured.</li>
+    </ul>
+  </section>
+</div>
+<div id="tip" role="tooltip"></div>
+
+<script>
+const D = {"tesseract":{"chrome":{"engine":"tesseract","force":"true","wall0":"2026-10-21T07:12:34.510Z","uploadMs":119.2,"totalMs":675884.6,"status":200,"X-Extract-Ms":602156,"X-Excel-Ms":73029,"X-Words":44981,"X-Pages":248,"sources":{"ocr":248},"bytes":3676516},"xlsx":{"sheets":248,"cells_base":23410,"cells_cand":24046,"cell_precision":0.8667137985527739,"cell_recall":0.8902605724049552,"cell_f1":0.8783293998651382,"sheets_same_cell_count":9},"cpu_avg_pct":90.66091180866965,"cpu_p95_pct":141.2,"rss_peak_mb":411.6,"rss_avg_mb":154.9618086696562,"sample_secs":716.98,"cpu_sec_per_page":2.621050828571773,"load_ms":0.0010000003385357559,"harness_total_s":656.5175267000013,"harness_peak_mb":125.1171875,"ocr_mean":2522.594335887143,"ocr_p50":2405.0367000018014,"ocr_p95":3376.6221000005316,"ocr_min":2078.10519999839,"ocr_max":4536.522400001559,"ocr_sd":386.73341969346893,"prep_mean":92.43803346762726,"cer":0.03841223092265139,"wer":0.10409806073911453,"bow_p":0.913763589070941,"bow_r":0.9399469447493597,"num_acc":0.9972131908964236,"num_total":8612,"num_miss":24,"date_acc":0.885989010989011,"date_total":5096,"iou_mean":0.5510593291805505,"iou50":0.9063959143968872,"gt_words":43728,"ocr_words":44981,"gt_chars":440719,"pages_cer_lt2":0,"pages_cer_lt5":206,"page_ocr":[4537,2829,3389,3560,2478,2505,2509,2506,2404,2467,2510,2540,2392,2389,2617,2520,2545,2498,2497,2552,2136,2194,2346,2124,2191,2153,2104,2423,2410,2344,2329,2259,2222,2326,3188,3507,3833,3265,3420,2919,2591,2739,2332,2405,2396,2192,2186,2140,2249,2653,2346,2220,2265,2329,2510,2425,2254,2129,2369,2498,2341,2614,2328,2274,2260,2141,2332,2157,2293,2227,2236,2364,2306,2204,2347,2185,2230,2361,2152,2110,2160,2397,2287,2406,2689,3511,3256,2896,2754,2527,2929,3198,3013,3145,2637,2879,2870,2347,2397,2259,2296,2381,2230,2405,2240,2136,2259,2245,2247,2176,2160,2147,2144,2251,2142,2225,2241,2381,2173,2188,2142,2118,2147,2078,2526,2448,2259,2211,2183,2274,2237,2266,2402,2387,2274,2438,2209,2276,2346,2640,2213,2133,2234,2206,2140,2078,2218,2137,2191,2230,2080,2419,2110,2564,2344,2311,2228,2498,2560,2531,2218,2307,2138,2541,2298,2254,2336,2240,2372,2630,2558,2476,2185,2420,2195,2317,2307,2341,2550,3265,3384,3251,3315,3000,2896,3164,3115,2899,3248,2415,2407,2505,2502,2748,3502,3869,2714,2564,2704,2959,2874,2567,2466,2983,2579,2618,2967,2879,2484,2508,2565,2527,2517,2544,2677,2681,2731,3410,3074,2935,3296,3518,2637,2410,2355,2410,2489,2655,2669,2428,2616,3084,2851,2805,2672,2989,2759,3377,2835,2532,2828,2608,2255,2613,2270,2394,2195,2227],"page_cer":[0.059,0.0238,0.0307,0.0247,0.0246,0.0239,0.0258,0.0248,0.0294,0.0349,0.0388,0.0358,0.0274,0.0407,0.0371,0.0259,0.042,0.0222,0.028,0.0277,0.0306,0.0269,0.0274,0.0368,0.03,0.0277,0.0361,0.0398,0.0302,0.0274,0.0287,0.0318,0.0489,0.0308,0.048,0.0305,0.071,0.0337,0.0281,0.0583,0.0577,0.027,0.0267,0.0268,0.027,0.0266,0.0301,0.0262,0.0299,0.028,0.0424,0.0292,0.0255,0.0665,0.0408,0.0287,0.0311,0.0243,0.0258,0.0421,0.0448,0.0346,0.0485,0.027,0.0262,0.0345,0.0261,0.026,0.0396,0.0251,0.059,0.0274,0.028,0.0458,0.0441,0.024,0.0256,0.0309,0.0257,0.0528,0.0261,0.0262,0.0284,0.0271,0.0284,0.0377,0.0483,0.0366,0.0243,0.0278,0.027,0.0263,0.0268,0.0474,0.0267,0.031,0.0365,0.0262,0.0287,0.0279,0.0263,0.036,0.0274,0.0593,0.0388,0.0546,0.0289,0.0375,0.0271,0.028,0.039,0.057,0.0411,0.0343,0.035,0.0387,0.0393,0.0537,0.0277,0.0283,0.047,0.0584,0.0351,0.0367,0.0356,0.0344,0.0371,0.0345,0.0338,0.0521,0.0374,0.0373,0.0378,0.0557,0.046,0.0404,0.033,0.0338,0.0365,0.0294,0.0358,0.0379,0.0375,0.023,0.038,0.0512,0.0286,0.0352,0.0513,0.0286,0.0571,0.0396,0.0357,0.0414,0.0275,0.0257,0.0278,0.0404,0.0466,0.027,0.0557,0.0457,0.044,0.0293,0.0275,0.0259,0.0238,0.0551,0.0386,0.0237,0.0447,0.0377,0.0333,0.0249,0.0448,0.044,0.0267,0.0362,0.0372,0.0351,0.0492,0.045,0.1108,0.0462,0.0616,0.0286,0.0471,0.0526,0.038,0.0372,0.0391,0.036,0.043,0.0268,0.0378,0.0275,0.0386,0.0785,0.0357,0.0466,0.036,0.055,0.0566,0.0377,0.0364,0.0357,0.0265,0.0329,0.0466,0.0473,0.0467,0.0455,0.0435,0.0739,0.054,0.0555,0.0567,0.0491,0.0381,0.0566,0.0464,0.0768,0.0378,0.0631,0.0563,0.0569,0.0505,0.0567,0.0395,0.0429,0.04,0.0566,0.0563,0.0539,0.0377,0.0477,0.0595,0.0372,0.0508,0.0459,0.0368,0.0522,0.0484,0.04,0.0334,0.0373,0.0265,0.0433],"cpu_series":[[1,0.0,84.0],[4,0.0,84.0],[7,0.0,84.0],[10,2.9,84.1],[13,0.0,84.1],[16,0.0,84.1],[20,0.0,84.1],[23,94.2,178.6],[26,14.7,132.2],[30,97.1,181.2],[33,96.9,181.9],[36,111.4,134.9],[39,96.9,174.3],[43,102.8,182.3],[46,88.3,182.7],[49,25.7,132.1],[52,54.9,175.0],[56,102.8,183.5],[59,100.0,181.2],[62,73.6,174.7],[65,100.0,183.6],[68,97.1,184.2],[72,135.4,160.5],[75,102.8,183.9],[78,8.8,137.3],[81,96.9,182.5],[84,100.0,183.9],[88,70.6,158.9],[91,100.0,183.7],[94,103.0,184.2],[97,244.8,162.0],[100,100.0,181.5],[104,96.9,182.1],[107,114.5,155.2],[110,103.2,171.6],[113,99.9,171.4],[117,49.9,162.9],[120,100.0,171.6],[123,50.0,140.9],[126,100.0,170.6],[129,103.0,172.0],[132,145.7,150.3],[136,94.3,170.9],[139,100.0,172.6],[142,142.8,150.6],[145,94.3,155.8],[149,97.1,157.2],[152,247.0,144.3],[155,100.0,158.2],[158,97.1,156.2],[161,100.0,157.1],[165,100.0,159.5],[168,127.4,134.5],[171,100.0,158.3],[174,94.4,159.8],[177,115.1,146.4],[181,99.9,160.1],[184,100.0,126.2],[187,100.0,156.8],[190,100.0,159.8],[193,141.2,136.1],[196,100.0,158.3],[200,100.0,155.8],[203,111.4,133.0],[206,96.9,150.4],[209,88.6,145.7],[213,91.4,134.0],[216,71.4,96.1],[219,102.8,132.3],[222,103.0,134.2],[226,204.1,112.6],[229,100.0,133.2],[232,99.9,135.1],[235,103.0,87.5],[238,97.1,133.9],[242,94.2,135.2],[245,100.1,96.0],[248,91.4,133.8],[251,97.1,135.5],[254,156.0,92.4],[258,100.0,134.2],[261,100.0,134.0],[264,97.1,178.0],[267,143.1,155.4],[271,100.0,177.2],[274,97.1,177.3],[277,25.7,152.8],[280,97.1,176.6],[284,100.0,178.6],[287,5.9,131.2],[290,88.3,170.9],[293,103.0,177.3],[296,0.0,131.3],[300,94.3,175.0],[303,97.1,178.2],[306,99.9,154.3],[309,100.0,178.5],[312,100.0,178.8],[316,12.1,173.5],[319,100.0,178.9],[322,149.8,155.3],[325,99.9,178.3],[329,103.0,179.0],[332,53.0,129.0],[335,88.3,176.6],[338,97.1,178.3],[341,123.6,155.4],[345,96.9,179.2],[348,94.0,179.5],[351,167.3,166.1],[354,96.9,179.7],[357,97.1,156.6],[361,97.1,178.6],[364,99.9,180.2],[367,63.8,157.8],[370,100.0,180.7],[373,97.1,180.3],[377,110.3,173.5],[380,97.1,180.7],[383,487.2,141.0],[386,91.4,179.6],[390,97.1,147.5],[393,73.6,124.2],[396,100.1,146.4],[399,99.9,147.7],[402,64.7,101.5],[406,97.3,146.8],[409,96.9,148.5],[412,135.4,124.2],[415,96.9,147.0],[419,100.0,148.8],[422,108.5,109.7],[425,100.0,148.1],[428,97.1,149.0],[431,194.8,125.5],[435,102.8,148.2],[438,97.1,144.0],[441,91.6,93.5],[444,91.4,138.1],[447,91.4,136.0],[451,17.1,89.7],[454,3.0,131.2],[457,97.3,136.5],[460,96.9,134.6],[464,70.5,130.4],[467,97.1,136.1],[470,97.3,133.6],[473,176.4,127.8],[476,97.3,136.1],[480,100.0,136.3],[483,59.4,127.7],[486,99.9,136.3],[489,97.1,134.0],[492,11.8,131.0],[496,97.1,136.6],[499,100.0,136.8],[502,189.9,115.0],[505,100.0,136.7],[509,97.1,136.9],[512,117.3,111.4],[515,100.0,134.7],[518,103.0,135.8],[521,173.6,113.4],[525,99.9,135.1],[528,97.1,136.5],[531,169.6,114.9],[534,100.0,135.3],[537,100.0,136.5],[541,117.1,90.0],[544,96.9,135.1],[547,99.9,136.8],[550,154.3,90.3],[553,94.3,135.4],[557,97.1,136.9],[560,91.2,108.4],[563,97.1,133.7],[566,100.0,135.5],[570,105.7,88.7],[573,97.3,130.9],[576,100.1,135.6],[579,97.1,111.3],[582,0.0,130.5],[585,100.0,135.8],[589,0.0,89.4],[592,8.8,130.7],[595,91.2,136.3],[598,100.0,134.2],[602,136.5,127.7],[605,94.3,136.3],[608,96.9,137.1],[611,85.3,113.6],[614,97.1,134.7],[618,94.2,135.6],[621,244.2,114.3],[624,99.9,104.5],[627,103.1,109.3],[630,88.6,113.6],[634,103.0,118.2],[637,99.9,122.9],[640,100.0,127.7],[643,100.0,132.7],[646,97.1,138.0],[650,97.1,143.2],[653,88.0,147.9],[656,97.1,152.6],[659,94.3,157.0],[662,97.1,161.3],[666,100.0,165.8],[669,94.3,170.8],[672,94.3,268.9],[675,55.9,278.5],[678,53.0,280.5],[682,88.3,297.4],[685,103.0,293.0],[688,100.0,293.0],[691,96.9,293.0],[694,97.1,293.0],[698,56.9,411.5],[702,0.0,294.2],[705,0.0,293.8],[708,0.0,292.6],[711,0.0,291.4],[714,0.0,291.4]],"confusions":[[" →\n",3181],[" →∅",668],["I→∅",638],["1→∅",525],["l→I",475],["A→∅",441],["2→∅",398],["-→ ",368],["0→∅",346],["N→∅",345],["P→∅",337],["-→∅",308],["D→∅",261],["6→∅",239],["8→∅",221]],"bow_f1":0.9266703491190296},"indra":{"chrome":{"engine":"indra","force":"true","wall0":"2026-10-21T07:24:25.148Z","uploadMs":112.8,"totalMs":662424.4,"status":200,"X-Extract-Ms":578135,"X-Excel-Ms":83796,"X-Words":43312,"X-Pages":248,"sources":{"ocr":248},"bytes":11617272,"note":"first Indra call on a fresh server: includes model load"},"xlsx":{"sheets":248,"cells_base":23410,"cells_cand":23115,"cell_precision":0.9520657581656933,"cell_recall":0.9400683468603162,"cell_f1":0.946029016657711,"sheets_same_cell_count":62},"cpu_avg_pct":503.37327935222675,"cpu_p95_pct":732.7,"rss_peak_mb":746.9,"rss_avg_mb":330.3668016194332,"sample_secs":699.86,"cpu_sec_per_page":14.205275132558443,"load_ms":4990.827499997977,"harness_total_s":698.6798906000004,"harness_peak_mb":568.37890625,"ocr_mean":2663.434582258208,"ocr_p50":2499.2591999980505,"ocr_p95":3843.177499999001,"ocr_min":1606.4517000013439,"ocr_max":7407.532600002014,"ocr_sd":673.6579379245868,"prep_mean":108.52208387091049,"cer":0.013952200835452976,"wer":0.038945298207098425,"bow_p":0.9707755027254821,"bow_r":0.9693102817416758,"num_acc":0.9986065954482118,"num_total":8612,"num_miss":12,"date_acc":0.9707613814756672,"date_total":5096,"iou_mean":0.5598149485175185,"iou50":0.9354975699523428,"gt_words":43728,"ocr_words":43662,"gt_chars":440719,"pages_cer_lt2":245,"pages_cer_lt5":247,"page_ocr":[3662,3343,4074,3250,2301,3543,2499,4738,3881,7408,4102,4711,3470,3238,3297,2987,2410,2579,2641,2834,2240,2467,2104,2709,3169,2431,2035,2642,3236,2388,2051,3120,2937,3196,2750,3626,3938,3075,3843,3046,2135,3035,3229,2844,3401,2586,2646,2147,2720,2113,3021,3212,3211,3597,3109,3396,2010,2757,2662,3174,2285,4901,3314,2964,2112,2006,2218,1925,2248,2486,2647,2313,2227,2663,2413,2405,2220,2477,2709,2186,2438,2621,2267,2605,2366,1995,2144,2382,3570,3339,2972,2036,2818,2074,2405,2578,4149,5279,3040,3364,3888,3489,3296,2508,2262,1963,2545,4130,2331,2306,2786,2258,1952,2087,2371,2410,3152,3422,3198,3269,2203,2449,2540,3833,2682,2582,2781,2351,1843,2129,2345,2379,2096,2239,2657,3401,2316,1888,2159,2452,2787,2546,2639,2176,2875,2418,2229,2493,2243,2577,2493,2765,2478,2539,2394,1962,2044,2291,2408,2150,2012,2246,1819,1813,2579,1923,2149,2334,2425,2830,2441,2562,2951,1947,2147,1813,2027,2465,1896,2909,3245,2209,2563,3753,2447,2306,2922,2430,1955,2573,3331,2058,2359,1948,2683,3032,1907,1978,2259,2716,2649,2926,2926,2279,2977,3244,3478,3006,3091,1722,2908,2527,2161,2476,2106,2908,2405,2453,2613,2162,1862,1883,2192,1898,1956,1921,2161,1792,2740,2531,2309,2123,3454,2510,3131,2837,2645,1981,3070,2897,2893,2283,2330,2050,2362,2293,1606,2251],"page_cer":[0.0157,0.0134,0.0114,0.0146,0.0097,0.0138,0.0113,0.0147,0.011,0.0133,0.0144,0.0145,0.0155,0.0165,0.0127,0.0145,0.0124,0.0097,0.0116,0.013,0.0141,0.0123,0.0122,0.0105,0.015,0.0136,0.0132,0.0107,0.0139,0.0117,0.0138,0.0162,0.0131,0.0154,0.0106,0.0153,0.0139,0.0122,0.0126,0.0106,0.0123,0.0141,0.0125,0.0131,0.0113,0.011,0.0125,0.0116,0.0147,0.0123,0.0149,0.0128,0.0101,0.0109,0.0112,0.0111,0.0127,0.0104,0.0106,0.0131,0.0099,0.0113,0.0156,0.0174,0.0168,0.0134,0.0165,0.0156,0.0113,0.0154,0.0157,0.0154,0.0123,0.0137,0.0128,0.009,0.0119,0.016,0.0149,0.011,0.0166,0.0154,0.0131,0.0127,0.0112,0.0131,0.0135,0.0134,0.0107,0.0139,0.0163,0.012,0.0155,0.011,0.0123,0.0107,0.0125,0.0154,0.0138,0.0131,0.0185,0.0133,0.0185,0.0169,0.0131,0.0129,0.0134,0.0146,0.0133,0.0177,0.0198,0.0134,0.0162,0.0127,0.0136,0.0121,0.0196,0.0131,0.013,0.015,0.0119,0.016,0.0105,0.0124,0.0126,0.0107,0.0124,0.0113,0.0097,0.0114,0.0117,0.0147,0.0129,0.0116,0.0146,0.0116,0.0091,0.0103,0.0116,0.01,0.0185,0.014,0.0188,0.0115,0.0111,0.0178,0.0202,0.0115,0.0171,0.0207,0.0146,0.0184,0.0113,0.0127,0.014,0.0117,0.0145,0.0138,0.019,0.014,0.0138,0.0143,0.019,0.0166,0.0166,0.0121,0.0114,0.0124,0.0145,0.0107,0.0105,0.015,0.0102,0.0119,0.0144,0.0122,0.0131,0.0148,0.0167,0.0164,0.0131,0.0115,0.0652,0.0186,0.013,0.0143,0.0142,0.0188,0.014,0.0141,0.015,0.0126,0.0173,0.0142,0.0137,0.0176,0.0173,0.0135,0.0119,0.0155,0.0126,0.0158,0.0136,0.0144,0.0116,0.0123,0.0144,0.0096,0.0135,0.0104,0.0132,0.0129,0.0122,0.0141,0.0124,0.0179,0.0135,0.0169,0.0131,0.016,0.0153,0.0134,0.0141,0.0144,0.0162,0.0156,0.0132,0.0144,0.0198,0.0193,0.016,0.0145,0.018,0.0125,0.018,0.0191,0.0135,0.0115,0.0153,0.0138,0.0158,0.0137,0.0125,0.0111,0.0094,0.0145,0.0132,0.0129],"cpu_series":[[1,0.0,291.1],[4,0.0,291.1],[7,0.0,291.1],[10,0.0,291.1],[13,160.1,342.5],[17,103.0,668.2],[20,521.7,625.1],[24,551.5,746.9],[27,659.1,627.5],[30,731.3,688.9],[34,731.3,624.6],[37,580.0,616.1],[40,525.6,627.5],[44,695.1,631.9],[47,743.1,649.4],[51,794.1,633.3],[54,621.7,684.4],[57,538.0,627.6],[61,557.8,676.6],[64,583.8,640.0],[67,631.1,707.6],[71,597.1,735.3],[74,729.9,623.9],[77,599.9,638.8],[81,570.0,730.2],[84,591.1,635.1],[88,767.3,663.3],[91,616.3,709.3],[94,616.3,651.3],[98,667.7,734.5],[101,630.0,614.9],[105,675.6,602.5],[108,614.1,598.8],[111,724.0,617.5],[115,677.0,616.8],[118,624.4,718.1],[121,546.1,594.0],[125,654.1,614.5],[128,652.5,601.1],[131,579.9,615.9],[135,763.3,622.4],[138,632.6,613.1],[142,652.2,626.8],[145,706.2,606.5],[148,717.0,579.6],[152,695.1,638.5],[155,670.0,581.5],[158,707.7,548.2],[162,637.0,549.8],[165,747.9,554.7],[168,771.0,500.5],[172,635.3,589.8],[175,671.3,468.8],[178,762.7,457.1],[182,722.7,412.4],[185,773.1,369.2],[189,616.3,368.1],[192,682.7,326.2],[195,637.0,331.4],[199,648.8,305.1],[202,602.2,305.9],[205,695.1,306.6],[209,477.4,335.1],[212,627.2,261.8],[216,667.7,239.6],[219,451.3,255.1],[223,635.5,248.8],[226,714.5,303.3],[229,686.8,246.1],[233,725.5,297.7],[236,759.8,213.3],[239,662.3,284.1],[243,657.7,195.3],[246,731.3,211.9],[249,683.9,212.9],[253,577.3,243.7],[256,637.0,212.9],[260,570.4,229.8],[263,624.5,224.5],[266,668.8,261.3],[270,600.3,191.4],[273,598.1,201.8],[277,635.5,194.9],[280,640.7,242.8],[283,742.7,212.0],[287,599.5,213.6],[290,570.4,235.8],[293,732.7,246.2],[297,535.6,295.7],[300,677.0,222.8],[304,650.6,196.5],[307,459.6,276.9],[310,741.0,177.8],[314,702.7,201.7],[317,682.7,196.6],[320,685.5,175.6],[324,681.2,216.9],[327,645.6,191.7],[330,592.2,216.5],[334,700.2,192.8],[337,621.8,215.2],[341,626.1,301.9],[344,588.4,183.8],[347,637.0,195.8],[351,664.5,257.6],[354,720.1,198.2],[358,576.1,214.6],[361,639.2,294.2],[364,757.7,177.3],[368,777.1,221.5],[371,667.3,209.3],[375,692.0,196.6],[378,737.0,182.3],[381,638.3,191.5],[385,465.6,176.6],[388,674.1,201.0],[392,516.3,292.2],[395,454.2,243.1],[399,622.8,295.8],[402,302.8,191.8],[406,699.8,187.0],[409,627.2,161.4],[412,532.5,255.7],[416,605.5,177.1],[419,580.0,163.8],[423,677.0,224.5],[426,339.3,281.6],[430,618.9,177.2],[433,691.3,180.7],[437,531.1,281.9],[440,570.8,236.1],[444,558.0,176.8],[447,497.5,283.9],[451,397.9,177.5],[454,669.6,153.4],[458,667.3,163.6],[461,649.4,177.4],[464,556.0,278.6],[468,496.8,170.5],[471,547.7,162.6],[475,597.8,194.3],[478,646.6,171.1],[481,458.7,201.4],[485,682.7,171.6],[488,494.7,249.4],[491,642.7,170.1],[495,711.7,156.2],[498,562.3,180.6],[502,511.3,168.5],[505,439.5,170.2],[509,203.7,178.1],[513,327.5,186.0],[517,410.4,154.7],[521,447.2,163.1],[525,639.5,163.7],[529,370.0,154.9],[533,290.6,202.6],[536,474.2,153.8],[540,552.4,265.9],[544,521.7,183.7],[547,591.1,166.2],[551,444.8,141.5],[554,497.5,155.3],[558,539.4,265.4],[561,548.8,159.8],[564,491.9,246.4],[568,541.9,173.1],[572,521.8,167.1],[575,428.2,161.9],[579,479.6,173.9],[582,646.6,161.9],[586,551.5,173.5],[589,390.6,171.8],[593,94.4,115.9],[596,77.7,119.2],[600,85.7,122.5],[603,97.1,126.6],[606,100.0,131.3],[609,68.6,337.3],[613,82.8,248.2],[616,100.0,243.5],[619,100.0,234.0],[622,85.2,234.7],[626,100.0,235.3],[629,91.6,236.0],[632,99.9,236.9],[635,100.0,237.4],[639,94.4,238.0],[642,97.1,227.6],[645,97.3,225.3],[648,103.0,247.2],[652,55.9,309.5],[655,48.7,311.5],[658,50.0,314.2],[661,99.9,322.8],[664,100.0,322.3],[668,94.3,321.8],[671,97.1,321.9],[674,88.3,321.7],[677,72.3,435.6],[681,117.1,478.6],[684,20.0,541.3],[688,80.0,541.9],[691,0.0,540.1],[694,97.7,536.8],[698,0.0,525.3]],"confusions":[[" →\n",3190],[" →∅",421],["l→I",396],["P→∅",218],["2→$",138],["6→∅",59],["I→l",24],["6→@",21],["0→∅",21],[".→∅",14],["2→∅",14],["K→∅",13],["7→∅",12],["C→∅",10],["r→∅",10]],"bow_f1":0.9700423389403822},"throughput":[{"engine":"tesseract","workers":1,"threads":1,"pages":24,"wall_s":58.514105800000834,"pages_per_s":0.4101575111141775,"mean_page_s":2.4168678958332444},{"engine":"tesseract","workers":4,"threads":1,"pages":24,"wall_s":18.424776399999246,"pages_per_s":1.3025938268646224,"mean_page_s":3.001484699999916},{"engine":"tesseract","workers":8,"threads":1,"pages":24,"wall_s":12.989474699999846,"pages_per_s":1.8476497744747356,"mean_page_s":4.040297462499893},{"engine":"indra","workers":1,"threads":8,"pages":24,"wall_s":49.447855999998865,"pages_per_s":0.4853597696935647,"mean_page_s":2.0353968124995845},{"engine":"indra","workers":2,"threads":4,"pages":24,"wall_s":33.38299449999977,"pages_per_s":0.7189289145406104,"mean_page_s":2.7261744374998975},{"engine":"indra","workers":4,"threads":1,"pages":24,"wall_s":29.12856439999814,"pages_per_s":0.8239334994484497,"mean_page_s":4.749300270833525},{"engine":"indra","workers":8,"threads":1,"pages":24,"wall_s":31.52769830000034,"pages_per_s":0.7612353991601012,"mean_page_s":9.798471574999743}]};
+const T = D.tesseract, I = D.indra, N = 248;
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const fmt = (v, d = 1) => v.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+const pct = (v, d = 1) => fmt(v * 100, d) + '%';
+const el = (t, a = {}, txt) => { const e = document.createElementNS('http://www.w3.org/2000/svg', t); for (const k in a) e.setAttribute(k, a[k]); if (txt != null) e.textContent = txt; return e; };
+const tip = document.getElementById('tip');
+function hover(node, html) {
+  node.addEventListener('mousemove', ev => { tip.innerHTML = html; tip.style.opacity = 1;
+    const x = Math.min(ev.clientX + 14, innerWidth - tip.offsetWidth - 8); tip.style.left = x + 'px'; tip.style.top = (ev.clientY + 14) + 'px'; });
+  node.addEventListener('mouseleave', () => tip.style.opacity = 0);
+}
+const COL = { indra: 'var(--indra)', tess: 'var(--tess)', base: 'var(--base)' };
+function niceTicks(max, n = 5) { const raw = max / n, p = 10 ** Math.floor(Math.log10(raw)), s = [1, 2, 2.5, 5, 10].find(m => m * p >= raw) * p; const t = []; for (let v = 0; v <= max + 1e-9; v += s) t.push(+v.toFixed(10)); if (t[t.length - 1] < max) t.push(t[t.length - 1] + s); return t; }
+
+/* Horizontal bars, like the reference figure: label column, bar, value at the end */
+function hbar(id, rows, o = {}) {
+  const W = o.W ?? 760, lw = o.labelW ?? 190, rw = o.rw ?? 120, bh = o.bh ?? 26, gap = o.gap ?? 18, top = 6;
+  const min = o.min ?? 0, ticks = o.ticks ?? niceTicks(Math.max(...rows.map(r => r.v)) * 1.02);
+  const max = o.max ?? ticks[ticks.length - 1];
+  const H = top + rows.length * (bh + gap) + 26 + (o.axisTitle ? 22 : 0);
+  const x = v => lw + (W - lw - rw) * (v - min) / (max - min);
+  const s = el('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': o.aria || '' });
+  const yEnd = top + rows.length * (bh + gap) - gap / 2;
+  (o.ticks ?? ticks).forEach(t => { if (t < min) return; s.append(el('line', { x1: x(t), x2: x(t), y1: top - 4, y2: yEnd, class: 'grid' }));
+    s.append(el('text', { x: x(t), y: yEnd + 18, 'text-anchor': 'middle', class: 'tick' }, o.tickFmt ? o.tickFmt(t) : t)); });
+  s.append(el('line', { x1: x(min), x2: x(min), y1: top - 4, y2: yEnd, class: 'axis' }));
+  rows.forEach((r, i) => {
+    const y = top + i * (bh + gap), w = Math.max(2, x(r.v) - x(min));
+    s.append(el('text', { x: 0, y: y + bh / 2 + 4, class: 'lbl', style: r.key === 'indra' ? 'fill:var(--indra);font-weight:500' : '' }, r.label));
+    const g = el('g');
+    g.append(el('rect', { x: x(min), y, width: w, height: bh, rx: 4, fill: COL[r.key], class: 'bar' }));
+    if (r.whisker) { const [a, b] = r.whisker; g.append(el('line', { x1: x(a), x2: x(b), y1: y + bh / 2, y2: y + bh / 2, stroke: 'var(--ink)', 'stroke-width': 1.5 }));
+      [a, b].forEach(v => g.append(el('line', { x1: x(v), x2: x(v), y1: y + 7, y2: y + bh - 7, stroke: 'var(--ink)', 'stroke-width': 1.5 }))); }
+    g.append(el('rect', { x: 0, y: y - gap / 2, width: W, height: bh + gap, class: 'hit' }));
+    s.append(g);
+    s.append(el('text', { x: Math.max(x(r.v), r.whisker ? x(r.whisker[1]) : 0) + 8, y: y + bh / 2 + 4, class: 'val', style: r.key === 'indra' ? 'fill:var(--indra)' : '' }, r.text));
+    hover(g, r.tip || `${r.label}<br>${r.text}`);
+  });
+  if (o.axisTitle) s.append(el('text', { x: (x(min) + x(max)) / 2, y: H - 4, 'text-anchor': 'middle', class: 'ax-title' }, o.axisTitle));
+  document.getElementById(id).append(s);
+}
+
+/* Stacked horizontal bars with a 2px surface gap between segments */
+function stack(id, rows, segs, o = {}) {
+  const W = 440, lw = 96, bh = 26, gap = 22, top = 0;
+  const max = o.max, ticks = niceTicks(max), mx = ticks[ticks.length - 1];
+  const H = top + rows.length * (bh + gap) + 34, x = v => lw + (W - lw - 70) * v / mx;
+  const s = el('svg', { viewBox: `0 0 ${W} ${H}` });
+  const yEnd = top + rows.length * (bh + gap) - gap / 2;
+  ticks.forEach(t => { s.append(el('line', { x1: x(t), x2: x(t), y1: top + 4, y2: yEnd, class: 'grid' })); s.append(el('text', { x: x(t), y: yEnd + 16, 'text-anchor': 'middle', class: 'tick' }, t + ' s')); });
+  rows.forEach((r, i) => {
+    const y = top + 4 + i * (bh + gap); let acc = 0;
+    s.append(el('text', { x: 0, y: y + bh / 2 + 4, class: 'lbl', style: r.key === 'indra' ? 'fill:var(--indra);font-weight:500' : '' }, r.label));
+    r.vals.forEach((v, j) => { const x0 = x(acc), x1 = x(acc + v); acc += v;
+      const seg = el('rect', { x: x0 + (j ? 1 : 0), y, width: Math.max(1, x1 - x0 - (j ? 1 : 0) - 1), height: bh, rx: j === r.vals.length - 1 ? 4 : 0, fill: COL[r.key], opacity: segs[j].op ?? 1 });
+      s.append(seg); hover(seg, `${r.label} · ${segs[j].name}<br>${fmt(v, 1)} s`); });
+    s.append(el('text', { x: x(acc) + 8, y: y + bh / 2 + 4, class: 'val' }, fmt(acc, 1) + ' s'));
+  });
+  document.getElementById(id).append(s);
+}
+
+/* Multi-series line with crosshair tooltip */
+function lines(id, series, o) {
+  const W = 760, H = o.h ?? 260, L = 52, R = 14, Tp = 12, B = 40;
+  const n = Math.max(...series.map(s => s.pts.length));
+  const xmax = o.xmax ?? Math.max(...series.flatMap(s => s.pts.map(p => p[0])));
+  const ticks = o.yticks ?? niceTicks(o.ymax ?? Math.max(...series.flatMap(s => s.pts.map(p => p[1])))), ymax = ticks[ticks.length - 1];
+  const x = v => L + (W - L - R) * (v - (o.xmin ?? 0)) / (xmax - (o.xmin ?? 0)), y = v => Tp + (H - Tp - B) * (1 - v / ymax);
+  const s = el('svg', { viewBox: `0 0 ${W} ${H}` });
+  ticks.forEach(t => { s.append(el('line', { x1: L, x2: W - R, y1: y(t), y2: y(t), class: 'grid' })); s.append(el('text', { x: L - 8, y: y(t) + 4, 'text-anchor': 'end', class: 'tick' }, o.yfmt ? o.yfmt(t) : t)); });
+  (o.xticks).forEach(t => s.append(el('text', { x: x(t), y: H - B + 18, 'text-anchor': 'middle', class: 'tick' }, t)));
+  s.append(el('line', { x1: L, x2: W - R, y1: y(0), y2: y(0), class: 'axis' }));
+  s.append(el('text', { x: (L + W - R) / 2, y: H - 4, 'text-anchor': 'middle', class: 'ax-title' }, o.xtitle));
+  series.forEach(se => s.append(el('path', { d: se.pts.map((p, i) => (i ? 'L' : 'M') + x(p[0]).toFixed(1) + ' ' + y(Math.min(p[1], ymax)).toFixed(1)).join(''), fill: 'none', stroke: COL[se.key], 'stroke-width': o.sw ?? 1.5, 'stroke-linejoin': 'round', opacity: .95 })));
+  const cross = el('line', { y1: Tp, y2: H - B, stroke: 'var(--muted)', 'stroke-dasharray': '3 3', opacity: 0 });
+  const dots = series.map(se => el('circle', { r: 4, fill: COL[se.key], stroke: 'var(--panel)', 'stroke-width': 2, opacity: 0 }));
+  s.append(cross, ...dots);
+  const hit = el('rect', { x: L, y: Tp, width: W - L - R, height: H - Tp - B, fill: 'transparent' }); s.append(hit);
+  hit.addEventListener('mousemove', ev => {
+    const r = s.getBoundingClientRect(), vx = (ev.clientX - r.left) * W / r.width, xv = (o.xmin ?? 0) + (vx - L) / (W - L - R) * (xmax - (o.xmin ?? 0));
+    let html = `<b>${o.xlabel(xv)}</b>`; cross.setAttribute('x1', vx); cross.setAttribute('x2', vx); cross.setAttribute('opacity', 1);
+    series.forEach((se, k) => { const p = se.pts.reduce((a, b) => Math.abs(b[0] - xv) < Math.abs(a[0] - xv) ? b : a);
+      dots[k].setAttribute('cx', x(p[0])); dots[k].setAttribute('cy', y(Math.min(p[1], ymax))); dots[k].setAttribute('opacity', 1); html += `<br>${se.name}: ${o.vfmt(p[1])}`; });
+    tip.innerHTML = html; tip.style.opacity = 1; tip.style.left = Math.min(ev.clientX + 14, innerWidth - tip.offsetWidth - 8) + 'px'; tip.style.top = ev.clientY + 14 + 'px';
+  });
+  hit.addEventListener('mouseleave', () => { tip.style.opacity = 0; cross.setAttribute('opacity', 0); dots.forEach(d => d.setAttribute('opacity', 0)); });
+  document.getElementById(id).append(s);
+}
+
+/* ---------- verdict cards ---------- */
+const eT = T.chrome.totalMs / 1000, eI = I.chrome.totalMs / 1000;
+const cards = [
+  ['Speed', 'Tie', 'n', `${fmt(N / eI, 3)} vs ${fmt(N / eT, 3)} pages/s end to end (Indra ${pct(1 - eI / eT, 0)} faster). OCR alone: ${fmt(I.ocr_mean / 1000, 2)} s vs ${fmt(T.ocr_mean / 1000, 2)} s per page. The app's “about 40% quicker” label does not hold on this machine.`],
+  ['Accuracy', 'Indra', 'i', `CER ${pct(I.cer)} vs ${pct(T.cer)}, about ${fmt(T.cer / I.cer, 1)}× fewer character errors. Dates ${pct(I.date_acc)} vs ${pct(T.date_acc)}, Excel cell F1 ${pct(I.xlsx.cell_f1)} vs ${pct(T.xlsx.cell_f1)}.`],
+  ['Efficiency', 'Tesseract', 't', `${fmt(T.cpu_sec_per_page, 1)} CPU-s per page vs ${fmt(I.cpu_sec_per_page, 1)}, and ${fmt(T.rss_peak_mb, 0)} MB vs ${fmt(I.rss_peak_mb, 0)} MB peak. Indra reaches the same wall-clock time by using all the cores.`],
+];
+document.getElementById('verdict').innerHTML = cards.map(([k, w, c, p]) => `<div class="vcard"><span class="k">${k}</span><span class="win ${c}">${c === 'n' ? 'No clear winner' : w + ' wins'}</span><p>${p}</p></div>`).join('');
+
+/* ---------- speed ---------- */
+hbar('c-pps', [
+  { key: 'indra', label: 'Indra OCR', v: N / eI, text: fmt(N / eI, 3) + ' pages/s', tip: `Indra OCR<br>${fmt(eI, 1)} s for 248 pages` },
+  { key: 'tess', label: 'Tesseract 5', v: N / eT, text: fmt(N / eT, 3), tip: `Tesseract 5<br>${fmt(eT, 1)} s for 248 pages` },
+  { key: 'base', label: 'Text layer, no OCR', v: N / 141.822, text: fmt(N / 141.822, 2), tip: 'Reference: text layer read directly<br>141.8 s for 248 pages' },
+], { ticks: [0, .25, .5, .75, 1, 1.25, 1.5, 1.75, 2], axisTitle: 'pages per second (higher is faster)', aria: 'Pages per second' });
+hbar('c-spp', [
+  { key: 'tess', label: 'Tesseract', v: T.ocr_mean / 1000, whisker: [T.ocr_p50 / 1000, T.ocr_p95 / 1000], text: fmt(T.ocr_mean / 1000, 2) + ' s', tip: `Tesseract 5<br>mean ${fmt(T.ocr_mean / 1000, 2)} s · p50 ${fmt(T.ocr_p50 / 1000, 2)} · p95 ${fmt(T.ocr_p95 / 1000, 2)}<br>min ${fmt(T.ocr_min / 1000, 2)} · max ${fmt(T.ocr_max / 1000, 2)}` },
+  { key: 'indra', label: 'Indra', v: I.ocr_mean / 1000, whisker: [I.ocr_p50 / 1000, I.ocr_p95 / 1000], text: fmt(I.ocr_mean / 1000, 2) + ' s', tip: `Indra OCR<br>mean ${fmt(I.ocr_mean / 1000, 2)} s · p50 ${fmt(I.ocr_p50 / 1000, 2)} · p95 ${fmt(I.ocr_p95 / 1000, 2)}<br>min ${fmt(I.ocr_min / 1000, 2)} · max ${fmt(I.ocr_max / 1000, 2)}` },
+], { W: 440, labelW: 96, rw: 64, ticks: [0, 1, 2, 3, 4], tickFmt: t => t + ' s', axisTitle: 'bar = mean · whisker = p50 to p95' });
+stack('c-phase', [
+  { key: 'tess', label: 'Tesseract', vals: [T.chrome.uploadMs / 1000, T.chrome['X-Extract-Ms'] / 1000, T.chrome['X-Excel-Ms'] / 1000, (T.chrome.totalMs - T.chrome.uploadMs - T.chrome['X-Extract-Ms'] - T.chrome['X-Excel-Ms']) / 1000] },
+  { key: 'indra', label: 'Indra', vals: [I.chrome.uploadMs / 1000, I.chrome['X-Extract-Ms'] / 1000, I.chrome['X-Excel-Ms'] / 1000, (I.chrome.totalMs - I.chrome.uploadMs - I.chrome['X-Extract-Ms'] - I.chrome['X-Excel-Ms']) / 1000] },
+], [{ name: 'Upload', fill: 'var(--muted)', op: .35 }, { name: 'OCR + layout', fill: 'var(--muted)', op: 1 }, { name: 'Excel write', fill: 'var(--muted)', op: .55 }, { name: 'Save + download', fill: 'var(--muted)', op: .3 }], { max: 680 });
+lines('c-pages', [
+  { key: 'tess', name: 'Tesseract', pts: T.page_ocr.map((v, i) => [i + 1, v]) },
+  { key: 'indra', name: 'Indra', pts: I.page_ocr.map((v, i) => [i + 1, v]) },
+], { xmin: 1, xmax: 248, xticks: [1, 50, 100, 150, 200, 248], yticks: [0, 2000, 4000, 6000, 8000], yfmt: t => t / 1000 + ' s', xtitle: 'page', xlabel: v => 'Page ' + Math.round(v), vfmt: v => fmt(v / 1000, 2) + ' s', sw: 1.25 });
+
+{ const lab = r => `${r.engine === 'indra' ? 'Indra' : 'Tesseract'} · ${r.workers}×${r.threads}`;
+  hbar('c-workers', D.throughput.map(r => ({ key: r.engine === 'indra' ? 'indra' : 'tess', label: lab(r), v: r.pages_per_s, text: fmt(r.pages_per_s, 2) + ' p/s',
+    tip: `${r.engine === 'indra' ? 'Indra' : 'Tesseract'}: ${r.workers} worker(s) × ${r.threads} thread(s)<br>${fmt(r.wall_s, 1)} s for ${r.pages} pages<br>mean ${fmt(r.mean_page_s, 2)} s per page per worker` })),
+    { labelW: 190, ticks: [0, 0.5, 1, 1.5, 2], bh: 20, gap: 10, axisTitle: 'pages per second · label = workers × threads per worker' }); }
+
+/* ---------- accuracy ---------- */
+hbar('c-err', [
+  { key: 'tess', label: 'Tesseract · CER', v: T.cer * 100, text: pct(T.cer, 2) },
+  { key: 'indra', label: 'Indra · CER', v: I.cer * 100, text: pct(I.cer, 2) },
+  { key: 'tess', label: 'Tesseract · WER', v: T.wer * 100, text: pct(T.wer, 2) },
+  { key: 'indra', label: 'Indra · WER', v: I.wer * 100, text: pct(I.wer, 2) },
+], { W: 440, labelW: 132, rw: 70, ticks: [0, 3, 6, 9, 12], tickFmt: t => t + '%', gap: 12, bh: 22 });
+hbar('c-thr', [
+  { key: 'indra', label: 'Indra · < 2%', v: I.pages_cer_lt2, text: I.pages_cer_lt2 + ' pages' },
+  { key: 'tess', label: 'Tesseract · < 2%', v: T.pages_cer_lt2, text: T.pages_cer_lt2 + ' pages' },
+  { key: 'indra', label: 'Indra · < 5%', v: I.pages_cer_lt5, text: I.pages_cer_lt5 + ' pages' },
+  { key: 'tess', label: 'Tesseract · < 5%', v: T.pages_cer_lt5, text: T.pages_cer_lt5 + ' pages' },
+], { W: 440, labelW: 132, rw: 84, ticks: [0, 62, 124, 186, 248], gap: 12, bh: 22 });
+const accRows = [['Numbers exact', 'num_acc'], ['Dates exact', 'date_acc'], ['Word recall', 'bow_r'], ['Word precision', 'bow_p'], ['Excel cell F1', null], ['Box IoU ≥ 0.5', 'iou50']];
+const accData = []; accRows.forEach(([lab, k]) => { const vi = k ? I[k] : I.xlsx.cell_f1, vt = k ? T[k] : T.xlsx.cell_f1;
+  accData.push({ key: 'indra', label: lab + ' · Indra', v: vi * 100, text: pct(vi, 2) }, { key: 'tess', label: lab + ' · Tess.', v: vt * 100, text: pct(vt, 2) }); });
+hbar('c-acc', accData, { labelW: 200, min: 80, max: 100, ticks: [80, 85, 90, 95, 100], tickFmt: t => t + '%', bh: 18, gap: 8 });
+lines('c-pcer', [
+  { key: 'tess', name: 'Tesseract', pts: T.page_cer.map((v, i) => [i + 1, v * 100]) },
+  { key: 'indra', name: 'Indra', pts: I.page_cer.map((v, i) => [i + 1, v * 100]) },
+], { xmin: 1, xmax: 248, xticks: [1, 50, 100, 150, 200, 248], yticks: [0, 2, 4, 6, 8], yfmt: t => t + '%', xtitle: 'page', xlabel: v => 'Page ' + Math.round(v), vfmt: v => fmt(v, 2) + '%', sw: 1.25, h: 220 });
+
+/* ---------- resources ---------- */
+const trim = ser => { const a = ser.findIndex(p => p[1] > 20); const t0 = ser[Math.max(0, a - 1)][0]; return ser.slice(Math.max(0, a - 1)).map(p => [p[0] - t0, p[1]]); };
+lines('c-cpu', [{ key: 'tess', name: 'Tesseract', pts: trim(T.cpu_series) }, { key: 'indra', name: 'Indra', pts: trim(I.cpu_series) }],
+  { xmax: 690, xticks: [0, 100, 200, 300, 400, 500, 600], yticks: [0, 200, 400, 600, 800], yfmt: t => t + '%', xtitle: 'seconds since request', xlabel: v => Math.round(v) + ' s', vfmt: v => fmt(v, 0) + '% (' + fmt(v / 100, 1) + ' cores)' });
+hbar('c-cpusec', [
+  { key: 'tess', label: 'Tesseract', v: T.cpu_sec_per_page, text: fmt(T.cpu_sec_per_page, 1) + ' s', tip: `Tesseract 5<br>avg ${fmt(T.cpu_avg_pct, 0)}% CPU over ${fmt(T.sample_secs, 0)} s` },
+  { key: 'indra', label: 'Indra', v: I.cpu_sec_per_page, text: fmt(I.cpu_sec_per_page, 1) + ' s', tip: `Indra OCR<br>avg ${fmt(I.cpu_avg_pct, 0)}% CPU over ${fmt(I.sample_secs, 0)} s` },
+], { W: 440, labelW: 96, rw: 64, ticks: [0, 4, 8, 12, 16] });
+hbar('c-mem', [
+  { key: 'tess', label: 'Tesseract', v: T.rss_peak_mb, text: fmt(T.rss_peak_mb, 0) + ' MB', tip: `Tesseract 5<br>peak ${fmt(T.rss_peak_mb, 0)} MB · avg ${fmt(T.rss_avg_mb, 0)} MB` },
+  { key: 'indra', label: 'Indra', v: I.rss_peak_mb, text: fmt(I.rss_peak_mb, 0) + ' MB', tip: `Indra OCR<br>peak ${fmt(I.rss_peak_mb, 0)} MB · avg ${fmt(I.rss_avg_mb, 0)} MB<br>model load ${fmt(I.load_ms / 1000, 1)} s` },
+], { W: 440, labelW: 96, rw: 70, ticks: [0, 200, 400, 600, 800] });
+
+/* ---------- error analysis ---------- */
+const esc = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const show = s => s.replace(/ /g, '␠').replace(/\n/g, '↵');
+const ct = T.confusions.filter(c => c[0] !== ' →\n').slice(0, 10), ci = I.confusions.filter(c => c[0] !== ' →\n').slice(0, 10);
+let cf = '<tr><th>#</th><th>Tesseract edit</th><th class="n">Count</th><th>Indra edit</th><th class="n">Count</th></tr>';
+for (let k = 0; k < 10; k++) cf += `<tr><td class="n" style="text-align:left">${k + 1}</td><td class="mono">${esc(show(ct[k][0]))}</td><td class="n">${ct[k][1]}</td><td class="mono">${esc(show(ci[k][0]))}</td><td class="n">${ci[k][1]}</td></tr>`;
+document.getElementById('conf').innerHTML = cf;
+
+/* ---------- all metrics ---------- */
+const M = [
+  ['Speed'],
+  ['End-to-end time in Chrome', T.chrome.totalMs / 1000, I.chrome.totalMs / 1000, v => fmt(v, 1) + ' s', 'low'],
+  ['End-to-end throughput', N / eT, N / eI, v => fmt(v, 3) + ' p/s', 'high'],
+  ['Server extract phase', T.chrome['X-Extract-Ms'] / 1000, I.chrome['X-Extract-Ms'] / 1000, v => fmt(v, 1) + ' s', 'low'],
+  ['Server Excel-write phase', T.chrome['X-Excel-Ms'] / 1000, I.chrome['X-Excel-Ms'] / 1000, v => fmt(v, 1) + ' s', 'low'],
+  ['OCR per page, mean', T.ocr_mean, I.ocr_mean, v => fmt(v, 0) + ' ms', 'low'],
+  ['OCR per page, median', T.ocr_p50, I.ocr_p50, v => fmt(v, 0) + ' ms', 'low'],
+  ['OCR per page, p95', T.ocr_p95, I.ocr_p95, v => fmt(v, 0) + ' ms', 'low'],
+  ['OCR per page, worst', T.ocr_max, I.ocr_max, v => fmt(v, 0) + ' ms', 'low'],
+  ['OCR per page, std dev', T.ocr_sd, I.ocr_sd, v => fmt(v, 0) + ' ms', 'low'],
+  ['Model load (cold start)', 0, I.load_ms / 1000, v => v ? fmt(v, 1) + ' s' : 'none', 'low'],
+  ['Accuracy'],
+  ['Character error rate', T.cer, I.cer, v => pct(v, 2), 'low'],
+  ['Word error rate', T.wer, I.wer, v => pct(v, 2), 'low'],
+  ['Word precision', T.bow_p, I.bow_p, v => pct(v, 2), 'high'],
+  ['Word recall', T.bow_r, I.bow_r, v => pct(v, 2), 'high'],
+  ['Word F1', T.bow_f1, I.bow_f1, v => pct(v, 2), 'high'],
+  ['Decimal numbers exact (of 8,612)', T.num_acc, I.num_acc, v => pct(v, 2), 'high'],
+  ['Wrong decimal numbers', T.num_miss, I.num_miss, v => fmt(v, 0), 'low'],
+  ['Dates exact (of 5,096)', T.date_acc, I.date_acc, v => pct(v, 2), 'high'],
+  ['Pages with CER < 2%', T.pages_cer_lt2, I.pages_cer_lt2, v => fmt(v, 0) + ' / 248', 'high'],
+  ['Box overlap IoU ≥ 0.5', T.iou50, I.iou50, v => pct(v, 1), 'high'],
+  ['Words emitted (reference 43,728)', T.ocr_words, I.ocr_words, v => fmt(v, 0), null],
+  ['Excel output'],
+  ['Cell precision vs text-layer workbook', T.xlsx.cell_precision, I.xlsx.cell_precision, v => pct(v, 2), 'high'],
+  ['Cell recall', T.xlsx.cell_recall, I.xlsx.cell_recall, v => pct(v, 2), 'high'],
+  ['Cell F1', T.xlsx.cell_f1, I.xlsx.cell_f1, v => pct(v, 2), 'high'],
+  ['Sheets with identical cell count', T.xlsx.sheets_same_cell_count, I.xlsx.sheets_same_cell_count, v => fmt(v, 0) + ' / 248', 'high'],
+  ['Workbook size', T.chrome.bytes / 2 ** 20, I.chrome.bytes / 2 ** 20, v => fmt(v, 1) + ' MB', null],
+  ['Resources'],
+  ['Average CPU during run', T.cpu_avg_pct, I.cpu_avg_pct, v => fmt(v, 0) + '%', 'low'],
+  ['CPU-seconds per page', T.cpu_sec_per_page, I.cpu_sec_per_page, v => fmt(v, 2) + ' s', 'low'],
+  ['Peak memory (process tree)', T.rss_peak_mb, I.rss_peak_mb, v => fmt(v, 0) + ' MB', 'low'],
+  ['Average memory', T.rss_avg_mb, I.rss_avg_mb, v => fmt(v, 0) + ' MB', 'low'],
+];
+let at = '<tr><th>Metric</th><th class="n">Tesseract 5</th><th class="n">Indra OCR</th><th class="n">Indra vs Tesseract</th></tr>';
+M.forEach(r => { if (r.length === 1) { at += `<tr class="grp"><td colspan="4">${r[0]}</td></tr>`; return; }
+  const [lab, t, i, f, dir] = r, bt = dir && (dir === 'low' ? t < i : t > i), bi = dir && (dir === 'low' ? i < t : i > t);
+  const rel = t ? (i - t) / t : null;
+  at += `<tr><td>${lab}</td><td class="n">${bt ? '<span class="best">' + f(t) + '</span>' : f(t)}</td><td class="n">${bi ? '<span class="best">' + f(i) + '</span>' : f(i)}</td><td class="n muted">${rel == null || !isFinite(rel) ? 'n/a' : (rel > 0 ? '+' : '') + fmt(rel * 100, 0) + '%'}</td></tr>`; });
+document.getElementById('all').innerHTML = at;
+</script>
+
+</body>
+</html>
