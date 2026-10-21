@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Statement Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f6fa; --surface: #ffffff; --ink: #0f172a; --ink-2: #334155; --muted: #64748b; --faint: #94a3b8;
+    --line: #e6e8ef; --line-2: #eef0f5;
+    --brand: #4f46e5; --brand-2: #7c3aed; --brand-soft: #eef2ff;
+    --ok: #10b981; --ok-soft: #ecfdf5; --err: #ef4444; --err-soft: #fef2f2;
+    --shadow-sm: 0 1px 2px rgba(15, 23, 42, .05);
+    --shadow: 0 1px 3px rgba(15, 23, 42, .06), 0 8px 24px -12px rgba(15, 23, 42, .12);
+    --shadow-lg: 0 20px 48px -20px rgba(79, 70, 229, .35);
+    --r: 16px; --ease: cubic-bezier(.2, .8, .2, 1);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 14px/1.55 Inter, "Segoe UI", system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
+  button { font: inherit; }
+  code { font-family: ui-monospace, Consolas, monospace; font-size: 12px; background: var(--line-2); padding: 1px 6px; border-radius: 5px; }
+
+  /* ---------- shell ---------- */
+  .app { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+  aside { background: #0b1020; color: #cbd5e1; padding: 22px 14px; display: flex; flex-direction: column; gap: 6px;
+          position: sticky; top: 0; height: 100vh; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 4px 10px 22px; color: #fff; font-weight: 700; font-size: 15px; }
+  .brand-mark { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center;
+                background: linear-gradient(135deg, var(--brand), var(--brand-2)); box-shadow: 0 6px 16px -6px var(--brand); }
+  .nav-label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: #64748b; padding: 12px 12px 6px; }
+  .nav a { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 9px; color: #cbd5e1;
+           text-decoration: none; font-weight: 500; transition: background .2s, color .2s; }
+  .nav a:hover { background: rgba(255,255,255,.06); color: #fff; }
+  .nav a.active { background: rgba(124, 58, 237, .18); color: #fff; }
+  .nav svg { width: 17px; height: 17px; opacity: .85; }
+  .side-foot { margin-top: auto; padding: 12px; border-radius: 12px; background: rgba(255,255,255,.04); font-size: 12px; }
+  .status { display: flex; align-items: center; gap: 8px; color: #e2e8f0; font-weight: 500; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #64748b; position: relative; }
+  .dot.on { background: var(--ok); } .dot.off { background: var(--err); }
+  .dot.on::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--ok);
+                   animation: ping 1.8s var(--ease) infinite; }
+  @keyframes ping { 0% { transform: scale(.6); opacity: .9; } 100% { transform: scale(1.8); opacity: 0; } }
+
+  .main { min-width: 0; }
+  .topbar { height: 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 32px;
+            background: rgba(245, 246, 250, .8); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 5;
+            border-bottom: 1px solid var(--line); }
+  .crumbs { color: var(--muted); font-weight: 500; } .crumbs b { color: var(--ink); font-weight: 600; }
+  .content { padding: 28px 32px 56px; max-width: 1180px; }
+
+  /* ---------- hero ---------- */
+  .hero { position: relative; overflow: hidden; border-radius: 20px; padding: 30px 32px; color: #fff; margin-bottom: 24px;
+          background: linear-gradient(120deg, #312e81, #4f46e5 45%, #7c3aed); box-shadow: var(--shadow-lg); }
+  .hero h1 { margin: 0 0 6px; font-size: 26px; letter-spacing: -.02em; }
+  .hero p { margin: 0; max-width: 620px; color: #e0e7ff; }
+  .hero .blob { position: absolute; border-radius: 50%; filter: blur(40px); opacity: .45; animation: float 12s ease-in-out infinite; }
+  .hero .b1 { width: 260px; height: 260px; background: #a78bfa; right: -60px; top: -90px; }
+  .hero .b2 { width: 200px; height: 200px; background: #22d3ee; right: 180px; bottom: -120px; animation-delay: -4s; }
+  @keyframes float { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-24px, 18px); } }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; position: relative; }
+  .chip { font-size: 12px; font-weight: 500; padding: 5px 11px; border-radius: 999px; background: rgba(255,255,255,.14);
+          border: 1px solid rgba(255,255,255,.2); }
+
+  /* ---------- stats ---------- */
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+  .stat { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px 18px; box-shadow: var(--shadow-sm); }
+  .stat .k { color: var(--muted); font-size: 12px; font-weight: 500; }
+  .stat .v { font-size: 24px; font-weight: 700; letter-spacing: -.02em; margin-top: 2px; }
+
+  /* ---------- converter cards ---------- */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 22px;
+          box-shadow: var(--shadow); transition: transform .35s var(--ease), box-shadow .35s var(--ease); }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(15,23,42,.05), 0 18px 40px -18px rgba(15,23,42,.22); }
+  .card-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .step { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-weight: 700; font-size: 13px;
+          color: var(--brand); background: var(--brand-soft); }
+  .card h2 { margin: 0; font-size: 16px; letter-spacing: -.01em; }
+  .card .sub { margin: 0; color: var(--muted); font-size: 13px; }
+  .tag { margin-left: auto; font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px; }
+  .tag.pdf { background: #fef2f2; color: #dc2626; } .tag.xlsx { background: #ecfdf5; color: #059669; }
+
+  .drop { position: relative; display: block; text-align: center; cursor: pointer; border-radius: 14px; padding: 34px 18px;
+          border: 1.5px dashed #c7cbe0; background: linear-gradient(#fbfbfe, #fbfbfe) padding-box;
+          transition: border-color .25s, background .25s, transform .25s var(--ease); }
+  .drop input { display: none; }
+  .drop:hover { border-color: var(--brand); background: var(--brand-soft); }
+  .drop.over { border-color: var(--brand); background: var(--brand-soft); transform: scale(1.015); }
+  .drop.over .up { transform: translateY(-6px); }
+  .drop.busy { pointer-events: none; opacity: .55; }
+  .up { width: 46px; height: 46px; margin: 0 auto 12px; border-radius: 12px; display: grid; place-items: center;
+        background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-sm); color: var(--brand);
+        transition: transform .3s var(--ease); }
+  .drop strong { display: block; font-weight: 600; }
+  .drop .hint { color: var(--muted); font-size: 12.5px; }
+  .drop .hint u { color: var(--brand); text-decoration: none; font-weight: 600; }
+
+  /* job panel */
+  .job { overflow: hidden; max-height: 0; opacity: 0; transition: max-height .45s var(--ease), opacity .3s, margin .3s; }
+  .job.show { max-height: 260px; opacity: 1; margin-top: 16px; }
+  .job-inner { border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+  .job-top { display: flex; align-items: center; gap: 12px; }
+  .file-ic { width: 36px; height: 36px; border-radius: 9px; display: grid; place-items: center; flex: none; font-size: 10px; font-weight: 700; }
+  .file-ic.pdf { background: #fef2f2; color: #dc2626; } .file-ic.xlsx { background: #ecfdf5; color: #059669; }
+  .job-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .job-meta { color: var(--muted); font-size: 12.5px; }
+  .job-text { min-width: 0; flex: 1; }
+  .bar { height: 6px; border-radius: 99px; background: var(--line-2); overflow: hidden; margin-top: 12px; position: relative; }
+  .bar i { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: inherit;
+           background: linear-gradient(90deg, var(--brand), var(--brand-2)); transition: width .3s var(--ease); }
+  .bar.indet i { width: 35%; animation: indet 1.2s ease-in-out infinite; }
+  @keyframes indet { 0% { left: -35%; } 100% { left: 100%; } }
+  .job.ok .bar i { width: 100% !important; background: var(--ok); animation: none; left: 0; }
+  .job.err .bar i { width: 100% !important; background: var(--err); animation: none; left: 0; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
+  .check { width: 28px; height: 28px; flex: none; }
+  .check circle { stroke: var(--ok); stroke-width: 2.5; fill: none; stroke-dasharray: 76; stroke-dashoffset: 76; animation: draw .5s var(--ease) forwards; }
+  .check path { stroke: var(--ok); stroke-width: 2.5; fill: none; stroke-linecap: round; stroke-linejoin: round;
+                stroke-dasharray: 20; stroke-dashoffset: 20; animation: draw .35s .4s var(--ease) forwards; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+
+  .btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--surface);
+         color: var(--ink-2); border-radius: 9px; padding: 7px 12px; font-size: 13px; font-weight: 500; cursor: pointer;
+         text-decoration: none; transition: border-color .2s, color .2s, transform .15s, box-shadow .2s; }
+  .btn:hover { border-color: #c7d2fe; color: var(--brand); box-shadow: var(--shadow-sm); }
+  .btn:active { transform: scale(.97); }
+  .btn.primary { background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #fff; border-color: transparent;
+                 box-shadow: 0 6px 16px -8px var(--brand); }
+  .btn.primary:hover { color: #fff; filter: brightness(1.06); }
+  .btn svg { width: 15px; height: 15px; }
+
+  /* ---------- history ---------- */
+  .section-h { display: flex; align-items: baseline; justify-content: space-between; margin: 32px 0 12px; }
+  .section-h h3 { margin: 0; font-size: 16px; letter-spacing: -.01em; }
+  .section-h span { color: var(--muted); font-size: 13px; }
+  .table { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow-sm); overflow: hidden; }
+  .tr { display: grid; grid-template-columns: 44px 1fr 180px auto; align-items: center; gap: 12px; padding: 12px 18px;
+        border-top: 1px solid var(--line-2); animation: rowIn .45s var(--ease) both; }
+  .tr:first-child { border-top: 0; }
+  .tr:hover { background: #fafbff; }
+  .tr .name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tr .when { color: var(--faint); font-size: 12.5px; }
+  .tr .acts { display: flex; gap: 6px; }
+  .th { color: var(--muted); font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; background: #fafbfc; animation: none; }
+  @keyframes rowIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .empty { padding: 34px; text-align: center; color: var(--muted); }
+  .empty .ill { width: 44px; height: 44px; margin: 0 auto 10px; border-radius: 12px; background: var(--brand-soft); display: grid; place-items: center; color: var(--brand); }
+
+  /* ---------- how it works ---------- */
+  .how { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .how .item { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; box-shadow: var(--shadow-sm); }
+  .how .n { font-size: 12px; font-weight: 700; color: var(--brand); }
+  .how h4 { margin: 6px 0 4px; font-size: 14px; }
+  .how p { margin: 0; color: var(--muted); font-size: 13px; }
+
+  /* ---------- toasts ---------- */
+  .toasts { position: fixed; right: 22px; bottom: calc(22px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 10px; z-index: 50; }
+  .toast { display: flex; align-items: center; gap: 10px; min-width: 260px; max-width: 380px; padding: 12px 14px;
+           background: #0f172a; color: #e2e8f0; border-radius: 12px; box-shadow: 0 12px 32px -12px rgba(0,0,0,.45);
+           animation: toastIn .4s var(--ease) both; font-size: 13px; }
+  .toast.out { animation: toastOut .3s ease forwards; }
+  .toast .ti { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; flex: none; font-size: 12px; font-weight: 700; }
+  .toast.ok .ti { background: var(--ok); color: #fff; } .toast.err .ti { background: var(--err); color: #fff; }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(12px) scale(.96); } to { opacity: 1; transform: none; } }
+  @keyframes toastOut { to { opacity: 0; transform: translateX(24px); } }
+
+  /* entrance */
+  .reveal { opacity: 0; transform: translateY(10px); animation: rowIn .6s var(--ease) forwards; }
+  .d1 { animation-delay: .05s; } .d2 { animation-delay: .12s; } .d3 { animation-delay: .19s; } .d4 { animation-delay: .26s; }
+
+  @media (max-width: 980px) {
+    .app { grid-template-columns: 1fr; }
+    aside { display: none; }
+    .how { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 720px) {
+    .grid, .stats, .how { grid-template-columns: 1fr; }
+    .content, .topbar { padding-left: 16px; padding-right: 16px; }
+    .tr { grid-template-columns: 40px 1fr auto; } .tr .when { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } .reveal { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand">
+      <div class="brand-mark"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4 3 8l4 4"/><path d="M3 8h14"/><path d="m17 20 4-4-4-4"/><path d="M21 16H7"/></svg></div>
+      Statement Studio
+    </div>
+    <div class="nav-label">Workspace</div>
+    <nav class="nav">
+      <a href="#convert" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4 3 8l4 4"/><path d="M3 8h14"/><path d="m17 20 4-4-4-4"/><path d="M21 16H7"/></svg>Convert</a>
+      <a href="#recent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Recent files</a>
+      <a href="#how"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14"/><path d="M12 17h.01"/></svg>How it works</a>
+    </nav>
+    <div class="side-foot">
+      <div class="status"><span class="dot" id="dot"></span><span id="health">Checking engine…</span></div>
+      <div style="color:#64748b;margin-top:4px">Files are saved to <code style="background:rgba(255,255,255,.08);color:#cbd5e1">output/</code></div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="crumbs">Workspace / <b>Convert</b></div>
+      <a class="btn" href="#how">Help</a>
+    </div>
+
+    <div class="content">
+      <section class="hero reveal d1" id="convert">
+        <span class="blob b1"></span><span class="blob b2"></span>
+        <h1>Edit bank statements in Excel</h1>
+        <p>Turn a statement PDF into a layout-matched workbook, edit values, and export a PDF identical to the original except for your edits.</p>
+        <div class="chips">
+          <span class="chip">OCR for scanned PDFs</span>
+          <span class="chip">Live SUM &amp; balance formulas</span>
+          <span class="chip">Pixel-perfect export</span>
+        </div>
+      </section>
+
+      <div class="stats">
+        <div class="stat reveal d2"><div class="k">Files converted</div><div class="v" id="stTotal">0</div></div>
+        <div class="stat reveal d3"><div class="k">Workbooks created</div><div class="v" id="stXlsx">0</div></div>
+        <div class="stat reveal d4"><div class="k">PDFs exported</div><div class="v" id="stPdf">0</div></div>
+      </div>
+
+      <div class="grid">
+        <section class="card reveal d2">
+          <div class="card-head">
+            <div class="step">01</div>
+            <div><h2>PDF to Excel</h2><p class="sub">Opens in Excel when it's ready</p></div>
+            <span class="tag pdf">PDF</span>
+          </div>
+          <label class="drop" id="dropPdf">
+            <input type="file" id="filePdf" accept="application/pdf,.pdf">
+            <div class="up"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="m6 10 6-6 6 6"/><path d="M4 20h16"/></svg></div>
+            <strong>Drop your statement PDF</strong>
+            <span class="hint">or <u>browse files</u> · up to 40 MB</span>
+          </label>
+          <div class="job" id="jobPdf"></div>
+        </section>
+
+        <section class="card reveal d3">
+          <div class="card-head">
+            <div class="step">02</div>
+            <div><h2>Excel to PDF</h2><p class="sub">Opens the PDF when it's ready</p></div>
+            <span class="tag xlsx">XLSX</span>
+          </div>
+          <label class="drop" id="dropXlsx">
+            <input type="file" id="fileXlsx" accept=".xlsx,.xlsm">
+            <div class="up"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="m6 10 6-6 6 6"/><path d="M4 20h16"/></svg></div>
+            <strong>Drop your edited workbook</strong>
+            <span class="hint">or <u>browse files</u> · save &amp; close it in Excel first</span>
+          </label>
+          <div class="job" id="jobXlsx"></div>
+        </section>
+      </div>
+
+      <div class="section-h" id="recent"><h3>Recent files</h3><span>Last 8 results in this browser</span></div>
+      <div class="table reveal d3" id="history"></div>
+
+      <div class="section-h" id="how"><h3>How it works</h3><span>Four steps, no setup</span></div>
+      <div class="how">
+        <div class="item reveal d1"><div class="n">STEP 1</div><h4>Read</h4><p>Text comes from the PDF's text layer, or OCR for scans. Logos and lines are detected too.</p></div>
+        <div class="item reveal d2"><div class="n">STEP 2</div><h4>Rebuild</h4><p>Each value lands in a cell at the same position, size and alignment as on the page.</p></div>
+        <div class="item reveal d3"><div class="n">STEP 3</div><h4>Edit</h4><p>Amounts are real numbers. Page Total uses <code>SUM</code>; balances update automatically.</p></div>
+        <div class="item reveal d4"><div class="n">STEP 4</div><h4>Export</h4><p>Only changed values are redrawn on the original page. No edits gives back the exact original.</p></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const enc = encodeURIComponent;
+  const extOf = (n) => (n.split('.').pop() || '').toLowerCase();
+  const kb = (b) => b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB';
+
+  /* engine status */
+  fetch('/api/health').then(r => r.json()).then(h => {
+    $('dot').className = 'dot ' + (h.tesseract ? 'on' : 'off');
+    $('health').textContent = h.tesseract ? 'Engine online · OCR ready' : 'Online · OCR not installed';
+  }).catch(() => { $('dot').className = 'dot off'; $('health').textContent = 'Server offline'; });
+
+  /* toasts */
+  function toast(kind, text) {
+    const t = document.createElement('div');
+    t.className = 'toast ' + kind;
+    t.innerHTML = `<span class="ti">${kind === 'ok' ? '✓' : '!'}</span><span>${esc(text)}</span>`;
+    $('toasts').appendChild(t);
+    setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 300); }, 3800);
+  }
+
+  /* actions */
+  const ICON_OPEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3h7v7"/><path d="M10 14 21 3"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>';
+  const ICON_FOLDER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
+  const ICON_DL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12"/><path d="m6 10 6 6 6-6"/><path d="M4 20h16"/></svg>';
+  document.addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-act]');
+    if (!b) return;
+    const r = await fetch(`/api/${b.dataset.act}/${enc(b.dataset.name)}`, { method: 'POST' });
+    if (!r.ok) toast('err', 'File not found in output/');
+  });
+
+  /* history + stats */
+  let history = [];
+  try { history = JSON.parse(localStorage.getItem('ss-history') || '[]'); } catch (_) {}
+  let counts = { xlsx: 0, pdf: 0 };
+  try { counts = JSON.parse(localStorage.getItem('ss-counts') || '{"xlsx":0,"pdf":0}'); } catch (_) {}
+
+  function countUp(el, to) {
+    const from = +el.textContent || 0, t0 = performance.now();
+    const step = (t) => { const p = Math.min(1, (t - t0) / 600); el.textContent = Math.round(from + (to - from) * (1 - Math.pow(1 - p, 3))); if (p < 1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  }
+  function renderStats() {
+    countUp($('stTotal'), counts.xlsx + counts.pdf); countUp($('stXlsx'), counts.xlsx); countUp($('stPdf'), counts.pdf);
+  }
+  function renderHistory() {
+    if (!history.length) {
+      $('history').innerHTML = `<div class="empty"><div class="ill">${ICON_FOLDER}</div>No files yet. Convert a statement to see it here.</div>`;
+      return;
+    }
+    $('history').innerHTML = `<div class="tr th"><span></span><span>File</span><span class="when">Created</span><span></span></div>` +
+      history.map((h, i) => {
+        const ext = extOf(h.name);
+        return `<div class="tr" style="animation-delay:${i * 40}ms">
+          <span class="file-ic ${ext === 'pdf' ? 'pdf' : 'xlsx'}">${ext.toUpperCase()}</span>
+          <span class="name" title="${esc(h.name)}">${esc(h.name)}</span>
+          <span class="when">${new Date(h.at).toLocaleString()}</span>
+          <span class="acts">
+            <button class="btn" data-act="open" data-name="${esc(h.name)}">${ICON_OPEN}Open</button>
+            <button class="btn" data-act="reveal" data-name="${esc(h.name)}" title="Show in folder">${ICON_FOLDER}</button>
+          </span>
+        </div>`;
+      }).join('');
+  }
+  function remember(name) {
+    history = [{ name, at: Date.now() }, ...history.filter(h => h.name !== name)].slice(0, 8);
+    counts[extOf(name) === 'pdf' ? 'pdf' : 'xlsx']++;
+    try { localStorage.setItem('ss-history', JSON.stringify(history)); localStorage.setItem('ss-counts', JSON.stringify(counts)); } catch (_) {}
+    renderHistory(); renderStats();
+  }
+  renderHistory(); renderStats();
+
+  /* upload with real progress */
+  function upload(url, file, onProgress) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url);
+      xhr.responseType = 'blob';
+      xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total);
+      xhr.upload.onload = () => onProgress(1);
+      xhr.onload = async () => {
+        if (xhr.status >= 200 && xhr.status < 300) return resolve(xhr);
+        let msg = xhr.statusText || 'Request failed';
+        try { msg = JSON.parse(await xhr.response.text()).detail || msg; } catch (_) {}
+        reject(new Error(msg));
+      };
+      xhr.onerror = () => reject(new Error('Server not reachable'));
+      const fd = new FormData(); fd.append('file', file); xhr.send(fd);
+    });
+  }
+
+  function wire(dropId, inputId, jobId, url, accept) {
+    const drop = $(dropId), input = $(inputId), job = $(jobId);
+
+    function panel(state, file, meta, extra = '') {
+      const ext = extOf(file);
+      const icon = state === 'ok'
+        ? '<svg class="check" viewBox="0 0 28 28"><circle cx="14" cy="14" r="12"/><path d="m9 14.5 3.2 3.2L19 11"/></svg>'
+        : `<span class="file-ic ${ext === 'pdf' ? 'pdf' : 'xlsx'}">${ext.toUpperCase()}</span>`;
+      job.className = 'job show ' + state;
+      job.innerHTML = `<div class="job-inner">
+        <div class="job-top">${icon}<div class="job-text"><div class="job-name">${esc(file)}</div><div class="job-meta">${meta}</div></div></div>
+        <div class="bar${state === 'busy' ? '' : ''}"><i></i></div>${extra}</div>`;
+    }
+
+    async function send(file) {
+      if (!file) return;
+      if (!accept.some(x => file.name.toLowerCase().endsWith(x))) { toast('err', `Please choose a ${accept.join(' / ')} file`); return; }
+      drop.classList.add('busy');
+      panel('busy', file.name, `Uploading · ${kb(file.size)}`);
+      const bar = job.querySelector('.bar'), fill = bar.querySelector('i'), meta = job.querySelector('.job-meta');
+      try {
+        const xhr = await upload(url, file, (p) => {
+          fill.style.width = Math.round(p * 100) + '%';
+          if (p >= 1) { bar.classList.add('indet'); fill.style.width = ''; meta.textContent = 'Processing… scanned pages take a few seconds'; }
+        });
+        const name = xhr.getResponseHeader('X-Saved-As');
+        const changes = xhr.getResponseHeader('X-Changes');
+        const pages = xhr.getResponseHeader('X-Pages');
+        const info = changes != null
+          ? (changes === '0' ? 'No edits found · original PDF returned' : `${changes} value(s) redrawn`)
+          : `${pages} page(s) · ${(xhr.getResponseHeader('X-Sources') || '').includes('ocr') ? 'read with OCR' : 'read from text layer'}`;
+        panel('ok', name, `Saved &amp; opened · ${info}`, `<div class="actions">
+          <button class="btn primary" data-act="open" data-name="${esc(name)}">${ICON_OPEN}Open again</button>
+          <button class="btn" data-act="reveal" data-name="${esc(name)}">${ICON_FOLDER}Show in folder</button>
+          <a class="btn" href="/api/files/${enc(name)}" download>${ICON_DL}Download</a></div>`);
+        remember(name);
+        toast('ok', `${name} is ready and opening`);
+      } catch (e) {
+        panel('err', file.name, esc(e.message));
+        toast('err', 'Conversion failed');
+      } finally {
+        drop.classList.remove('busy');
+        input.value = '';
+      }
+    }
+
+    input.addEventListener('change', () => send(input.files[0]));
+    let depth = 0;
+    drop.addEventListener('dragenter', e => { e.preventDefault(); depth++; drop.classList.add('over'); });
+    drop.addEventListener('dragover', e => e.preventDefault());
+    drop.addEventListener('dragleave', e => { e.preventDefault(); if (--depth <= 0) { depth = 0; drop.classList.remove('over'); } });
+    drop.addEventListener('drop', e => { e.preventDefault(); depth = 0; drop.classList.remove('over'); send(e.dataTransfer.files[0]); });
+  }
+
+  wire('dropPdf', 'filePdf', 'jobPdf', '/api/pdf-to-excel', ['.pdf']);
+  wire('dropXlsx', 'fileXlsx', 'jobXlsx', '/api/excel-to-pdf', ['.xlsx', '.xlsm']);
+
+  /* sidebar active state on scroll */
+  const links = [...document.querySelectorAll('.nav a')];
+  const io = new IntersectionObserver((entries) => entries.forEach(en => {
+    if (en.isIntersecting) links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + en.target.id));
+  }), { rootMargin: '-40% 0px -55% 0px' });
+  ['convert', 'recent', 'how'].forEach(id => io.observe($(id)));
+  links.forEach(a => a.addEventListener('click', e => { e.preventDefault(); document.querySelector(a.getAttribute('href')).scrollIntoView({ behavior: 'smooth' }); }));
+</script>
+</body>
+</html>
